@@ -169,7 +169,7 @@ func (s *Server) receiveMessages(client *Client) {
 			}
 		}
 
-		s.broadcastUserList()
+		s.broadcastUserList("")
 		fmt.Println(client.Username, "disconnected")
 	}()
 
@@ -196,6 +196,8 @@ func (s *Server) receiveMessages(client *Client) {
 		// Send to all sessions of the recipient
 		if recipientSessions, ok := s.clients[msg.To]; ok {
 			for _, recipient := range recipientSessions {
+				fmt.Println(msg.To)
+				s.broadcastUserList(msg.To)
 				err := recipient.Conn.WriteJSON(msg)
 				if err != nil {
 					fmt.Println("Send Error to recipient:", err)
@@ -218,10 +220,16 @@ func (s *Server) receiveMessages(client *Client) {
 }
 
 // Modified broadcastUserList function
-func (S *Server) broadcastUserList() {
+func (S *Server) broadcastUserList(lastsender string) {
 	var usernames []string
+	if lastsender != "" {
+		usernames = append(usernames, lastsender)
+	}
+
 	for username := range S.clients {
-		usernames = append(usernames, username)
+		if lastsender != username {
+			usernames = append(usernames, username)
+		}
 	}
 
 	// Send to all client sessions
@@ -245,5 +253,4 @@ func (S *Server) DataBase() {
 
 func (S *Server) Shutdown() {
 	S.db.Close()
-	fmt.Println("chi 9alwa")
 }
