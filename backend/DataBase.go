@@ -67,6 +67,15 @@ func createTables(db *sql.DB) (int, error) {
     nickname TEXT,
     expires_at DATETIME,
     FOREIGN KEY(nickname) REFERENCES users(nickname)
+	)`,
+		`CREATE TABLE IF NOT EXISTS notifications (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	receiver_nickname TEXT,
+	sender_nickname TEXT,
+	unread_messages INTEGER DEFAULT 0,
+	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	FOREIGN KEY(receiver_nickname) REFERENCES users(nickname),
+	FOREIGN KEY(sender_nickname) REFERENCES users(nickname)
 	)`}
 
 	for i := 0; i < len(tables); i++ {

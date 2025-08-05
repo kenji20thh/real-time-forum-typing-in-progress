@@ -11,7 +11,7 @@ const messagePerPage = 10
 let isFetching = false
 let noMoreMessages = false
 let chatContainer = null
-
+let newMessages = 0
 // throttle function with func and wait time as args
 const throttle = (fn, wait) => {
   let lastTime = 0
@@ -32,7 +32,7 @@ async function loadMessagesPage(from, to, page) {
   if (loader) loader.classList.remove("hidden")
 
   try {
-    const res = await fetch(`/messages?from=${from}&to=${to}&offset=${offset}`)
+    const res = await fetch(`/messages?from=${from}&to=${to}&offset=${offset+newMessages}`)
     if (!res.ok) throw new Error("Failed to load chat messages")
     const messages = await res.json()
     if (messages.length === 0) {
@@ -62,7 +62,7 @@ async function loadMessagesPage(from, to, page) {
     setTimeout(() => {
       if (loader) loader.classList.add("hidden")
       isFetching = false
-
+      
       const container = document.getElementById("chatMessages")
       if (container && container.scrollTop <= 100 && !noMoreMessages) {
         setTimeout(() => {
@@ -97,15 +97,14 @@ export function startChatFeature(currentUsername) {
     if (data.type === "user_list") {
       setUserList(data.users)
     } else {
+      newMessages++
       if (data.from === selectedUser || data.to === selectedUser) {
         renderMessage(data)
         const chatKey = data.from === currentUser ? data.to : data.from
         const cached = chatCache.get(chatKey) || []
         chatCache.set(chatKey, [...cached, data])
       } else if (data.to === currentUser) {
-        const prev = unreadCounts.get(data.from) || 0
-        unreadCounts.set(data.from, prev + 1)
-        updateNotificationBadge(data.from)
+        notification(data.to,data.from)
       }
     }
   })
@@ -144,12 +143,6 @@ export function startChatFeature(currentUsername) {
         })
     }
     sendBtn.addEventListener("click", sendMessage);
-    input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault()
-        sendMessage()
-      }
-    })
   }
 }
 
@@ -210,7 +203,6 @@ function setUserList(users) {
       document.getElementById("chatWindow").classList.remove("hidden")
       document.getElementById("chatMessages").innerHTML = ""
 
-      unreadCounts.set(username, 0)
       const badge = div.querySelector(".notification-badge")
       if (badge) badge.remove()
 
@@ -248,13 +240,14 @@ function setUserList(users) {
   })
 }
 
-function updateNotificationBadge(fromUser) {
+function updateNotificationBadge(data) {
   const userList = document.getElementById("userList")
   const users = userList.getElementsByClassName("user")
+  if (!userList) return;
 
   for (let div of users) {
     const nameSpan = div.querySelector("span:first-child")
-    if (nameSpan && nameSpan.textContent === fromUser) {
+    if (nameSpan && nameSpan.textContent === data.sender_nickname) {
       let badge = div.querySelector(".notification-badge")
 
       if (!badge) {
@@ -262,7 +255,34 @@ function updateNotificationBadge(fromUser) {
         badge.classList.add("notification-badge")
         div.appendChild(badge)
       }
-      badge.textContent = unreadCounts.get(fromUser)
+      badge.textContent = data.unread_messages
     }
   }
+}
+
+function notification(receiver,sender) {
+    const notifData = {
+    receiver_nickname: receiver,
+    sender_nickname: sender
+  };
+
+  fetch("/notification", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(notifData)
+  })
+    .then(res => {
+      if (!res.ok) {
+        throw new Error("notif failed");
+      }
+      return res.json();
+    })
+    .then(data => {
+      updateNotificationBadge(data)
+    })
+    .catch(err => {
+      console.error(err);
+    });
 }
