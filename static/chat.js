@@ -286,3 +286,17 @@ function notification(receiver,sender) {
       console.error(err);
     });
 }
+
+let thawa = document.getElementById("messageInput")
+thawa.addEventListener("input", () => {
+  if (!selectedUser || !currentUser) return;
+
+  const typingEvent = {
+    type: "typing",              // Important: backend uses this to identify typing event
+    typing: true,                // typing indicator
+    receiver: selectedUser,      // correct receiver
+    sender: currentUser          // correct sender
+  }
+
+  socket.send(JSON.stringify(typingEvent));  // Actually sends it to the backend
+})
