@@ -333,13 +333,3 @@ func (s *Server) GetMessagesHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(messages)
 }
-
-func (s *Server) sendToUser(username string, msg WSMessage) {
-	clients := s.clients[username]
-	for _, c := range clients {
-		err := c.Conn.WriteJSON(msg)
-		if err != nil {
-			fmt.Println("Error sending to", username, ":", err)
-		}
-	}
-}
