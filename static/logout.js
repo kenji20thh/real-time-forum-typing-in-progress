@@ -9,13 +9,12 @@ export function logout(event) {
     }
   })
     .then(res => {
-      if (!res.ok) {
-        throw new Error("logout failed");
-      }
+      if (!res.ok) throw new Error("logout failed");
       return res.text();
     })
-    .then(() => window.location.reload())
-    .catch(err => {
-      console.error(err);
-    });
+    .then(() => {
+      localStorage.setItem('logout', Date.now());
+      window.location.reload()
+    })
+    .catch(err => console.error(err));
 }

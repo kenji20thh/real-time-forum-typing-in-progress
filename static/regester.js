@@ -10,6 +10,31 @@ export function handleRegister(event) {
     return
   }
 
+  if (document.getElementById("nickname").value == "") {
+    alert("nickname empty")
+    return
+  }
+  if (document.getElementById("firstName").value == "") {
+    alert("firstName empty")
+    return
+  }
+  if (document.getElementById("lastName").value == "") {
+    alert("lastName empty")
+    return
+  }
+  if (document.getElementById("email").value == "") {
+    alert("email empty")
+    return
+  }
+  if (document.getElementById("password").value == "" || (document.getElementById("password").value).length<8) {
+    alert("email empty or <8")
+    return
+  } 
+  if (document.getElementById("gender").value == "") {
+    alert("gender empty")
+    return
+  }
+
   const formData = {
     nickname: document.getElementById("nickname").value,
     first_name: document.getElementById("firstName").value,

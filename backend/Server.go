@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"html"
 	"log"
 	"net/http"
 	"time"
@@ -73,7 +74,7 @@ func (S *Server) AddUser(user User) string {
 	}
 	query := `INSERT INTO users (nickname, first_name, last_name, email, password, age, gender)
 		VALUES (?, ?, ?, ?, ?, ?, ?)`
-	_, err = S.db.Exec(query, user.Nickname, user.FirstName, user.LastName, user.Email, string(hashedPassword), user.Age, user.Gender)
+	_, err = S.db.Exec(query, html.EscapeString(user.Nickname), html.EscapeString(user.FirstName), html.EscapeString(user.LastName), html.EscapeString(user.Email), string(hashedPassword), user.Age, user.Gender)
 	if err != nil {
 		return error.Error(err)
 	}
@@ -120,7 +121,6 @@ func (S *Server) MakeToken(Writer http.ResponseWriter, username string) {
 	_, err := S.db.Exec("INSERT INTO sessions (session_id, nickname, expires_at) VALUES (?, ?, ?)",
 		sessionID, username, expirationTime)
 	if err != nil {
-		fmt.Println("'tocken err'")
 		http.Error(Writer, "Error creating session", http.StatusInternalServerError)
 		return
 	}
@@ -187,7 +187,7 @@ func (s *Server) receiveMessages(client *Client) {
 		_, err = s.db.Exec(`
 			INSERT INTO messages (sender, receiver, content, timestamp)
 			VALUES (?, ?, ?, ?)`,
-			msg.From, msg.To, msg.Content, msg.Timestamp)
+			msg.From, msg.To, html.EscapeString(msg.Content), msg.Timestamp)
 		if err != nil {
 			fmt.Println("DB Insert Error:", err)
 			continue
@@ -196,7 +196,6 @@ func (s *Server) receiveMessages(client *Client) {
 		// Send to all sessions of the recipient
 		if recipientSessions, ok := s.clients[msg.To]; ok {
 			for _, recipient := range recipientSessions {
-				fmt.Println(msg.To)
 				s.broadcastUserList(msg.To)
 				err := recipient.Conn.WriteJSON(msg)
 				if err != nil {

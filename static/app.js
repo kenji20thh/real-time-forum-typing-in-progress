@@ -5,6 +5,13 @@ import { loadPosts } from './posts.js';
 import { logout } from './logout.js';
 
 
+window.addEventListener('storage', function (event) {
+  console.log('Storage event triggered:', event);
+  if (event.key === 'logout') {
+    window.location.reload()
+  }
+});
+
 export function showSection(sectionId) {
   document.querySelectorAll('section').forEach(section => {
     section.classList.add('hidden');
