@@ -52,9 +52,3 @@ type WSMessage struct {
 	Type string      `json:"type"`
 	Data interface{} `json:"data"`
 }
-
-type TypingPayload struct {
-	Sender   string `json:"sender"`
-	Receiver string `json:"receiver"`
-	Typing   bool   `json:"typing"`
-}
