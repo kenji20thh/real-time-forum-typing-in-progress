@@ -52,3 +52,8 @@ type WSMessage struct {
 	Type string      `json:"type"`
 	Data interface{} `json:"data"`
 }
+
+type TypingPayload struct {
+	From string `json:"from"`
+	To   string `json:"to"`
+}
