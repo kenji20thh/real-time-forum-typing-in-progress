@@ -294,14 +294,14 @@ function notification(receiver, sender, unread) {
   })
     .then(res => {
       if (!res.ok) {
-        throw new Error("notif failed");
+        throw new Error("notif failed")
       }
-      return res.json();
+      return res.json()
     })
     .then(data => {
       updateNotificationBadge(data)
     })
     .catch(err => {
-      console.error(err);
-    });
+      console.error(err)
+    })
 }
