@@ -627,9 +627,10 @@ button[type="submit"]:hover {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  height: 500px;
+  height: 600px; /* Increased from 500px */
   position: relative;
 }
+
 
 #chatWindow::before {
   content: "";
@@ -697,6 +698,10 @@ button[type="submit"]:hover {
   border: 1px solid var(--border);
   max-width: 80%;
   position: relative;
+  word-wrap: break-word; /* Added for text wrapping */
+  word-break: break-word; /* Added for text wrapping */
+  overflow-wrap: break-word; /* Added for text wrapping */
+  white-space: pre-wrap; /* Added to preserve formatting while wrapping */
 }
 
 #chatMessages p::before {
@@ -747,25 +752,29 @@ button[type="submit"]:hover {
 #chatWindow > div:last-child {
   display: flex;
   gap: var(--space-md);
-  padding: var(--space-lg);
+  padding: var(--space-md); /* Reduced from var(--space-lg) */
   border-top: 1px solid var(--border);
   background: var(--surface);
 }
 
+
 #messageInput {
   flex: 1;
-  padding: var(--space-md);
+  padding: var(--space-sm); /* Reduced from var(--space-md) */
   border: 1px solid var(--border);
   background: var(--background);
+  height: 36px; /* Added fixed height for shorter input */
 }
+
 
 #sendBtn {
   background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
   color: white;
-  padding: var(--space-md) var(--space-xl);
+  padding: var(--space-sm) var(--space-lg); /* Reduced vertical padding */
   font-weight: 700;
   border: 1px solid var(--primary);
   box-shadow: var(--shadow-cyber);
+  height: 36px; /* Added fixed height to match input */
 }
 
 #sendBtn:hover {
@@ -784,6 +793,18 @@ button[type="submit"]:hover {
 /* Utility Classes */
 .hidden {
   display: none !important;
+}
+
+@media (max-width: 768px) {
+  #chatWindow {
+    height: 500px; /* Increased from 400px for mobile */
+  }
+}
+
+@media (max-width: 480px) {
+  #chatWindow {
+    height: 450px; /* Increased from 350px for small mobile */
+  }
 }
 
 /* Responsive Design */
