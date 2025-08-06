@@ -12,6 +12,12 @@ let isFetching = false
 let noMoreMessages = false
 let chatContainer = null
 let newMessages = 0
+
+// Typing indicator variables
+let typingTimeout = null
+let isTyping = false
+const TYPING_TIMEOUT = 3000 // Stop showing typing after 3 seconds of inactivity
+
 // throttle function with func and wait time as args
 const throttle = (fn, wait) => {
   let lastTime = 0
@@ -21,6 +27,15 @@ const throttle = (fn, wait) => {
       lastTime = now
       fn.apply(this, args)
     }
+  }
+}
+
+// Debounce function for typing indicator
+const debounce = (fn, delay) => {
+  let timeoutId
+  return function (...args) {
+    clearTimeout(timeoutId)
+    timeoutId = setTimeout(() => fn.apply(this, args), delay)
   }
 }
 
@@ -87,6 +102,43 @@ const renderMessageAtTop = (msg) => {
   container.insertBefore(div, container.firstChild)
 }
 
+// Function to send typing status
+function sendTypingStatus(isTypingNow) {
+  if (!socket || !selectedUser) return
+  
+  const typingMessage = {
+    type: 'typing',
+    from: currentUser,
+    to: selectedUser,
+    isTyping: isTypingNow
+  }
+  
+  socket.send(JSON.stringify(typingMessage))
+}
+
+// Function to show/hide typing indicator
+function showTypingIndicator(username, show) {
+  const container = document.getElementById("chatMessages")
+  let typingIndicator = document.getElementById("typingIndicator")
+  
+  if (show && !typingIndicator) {
+    typingIndicator = document.createElement("div")
+    typingIndicator.id = "typingIndicator"
+    typingIndicator.className = "typing-indicator"
+    typingIndicator.innerHTML = `
+      <p><em>${username} is typing</em>
+        <span class="typing-dots">
+          <span>.</span><span>.</span><span>.</span>
+        </span>
+      </p>
+    `
+    container.appendChild(typingIndicator)
+    container.scrollTop = container.scrollHeight
+  } else if (!show && typingIndicator) {
+    typingIndicator.remove()
+  }
+}
+
 // real time connexion using websockets, listens for msg, update
 export function startChatFeature(currentUsername) {
   currentUser = currentUsername
@@ -96,7 +148,17 @@ export function startChatFeature(currentUsername) {
     const data = JSON.parse(event.data)
     if (data.type === "user_list") {
       setUserList(data.users)
+    } else if (data.type === "typing") {
+      // Handle typing indicator
+      if (data.from === selectedUser) {
+        showTypingIndicator(data.from, data.isTyping)
+      }
     } else {
+      // Hide typing indicator when message is received
+      if (data.from === selectedUser) {
+        showTypingIndicator(data.from, false)
+      }
+      
       newMessages++
       if (data.from === selectedUser || data.to === selectedUser) {
         renderMessage(data)
@@ -112,7 +174,45 @@ export function startChatFeature(currentUsername) {
   const sendBtn = document.getElementById("sendBtn")
   const input = document.getElementById("messageInput")
   if (sendBtn && input) {
+    
+    // Add typing event listeners
+    const handleTyping = debounce(() => {
+      if (isTyping) {
+        isTyping = false
+        sendTypingStatus(false)
+      }
+    }, 1000) // Stop typing after 1 second of inactivity
+
+    input.addEventListener('input', () => {
+      if (!isTyping && input.value.trim().length > 0) {
+        isTyping = true
+        sendTypingStatus(true)
+      } else if (isTyping && input.value.trim().length === 0) {
+        isTyping = false
+        sendTypingStatus(false)
+        return
+      }
+      
+      if (input.value.trim().length > 0) {
+        handleTyping()
+      }
+    })
+
+    // Stop typing on blur
+    input.addEventListener('blur', () => {
+      if (isTyping) {
+        isTyping = false
+        sendTypingStatus(false)
+      }
+    })
+
     const sendMessage = () => {
+      // Stop typing indicator when sending
+      if (isTyping) {
+        isTyping = false
+        sendTypingStatus(false)
+      }
+      
       fetch('/logged', {
         credentials: 'include'
       })
@@ -142,7 +242,15 @@ export function startChatFeature(currentUsername) {
           document.getElementById("chatWindow").classList.add('hidden')
         })
     }
+    
     sendBtn.addEventListener("click", sendMessage);
+    
+    // Send on Enter key
+    input.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        sendMessage()
+      }
+    })
   }
 }
 
@@ -179,6 +287,12 @@ function setUserList(users) {
     div.appendChild(statusSpan)
     notification(currentUser, username)
     div.addEventListener("click", async () => {
+      // Reset typing status when switching chats
+      if (isTyping) {
+        isTyping = false
+        sendTypingStatus(false)
+      }
+      
       chatPage = 0
       noMoreMessages = false
       chatContainer = document.getElementById("chatMessages")
@@ -211,6 +325,11 @@ function setUserList(users) {
       const closeChatBtn = document.getElementById("closeChatBtn")
       if (closeChatBtn) {
         closeChatBtn.onclick = () => {
+          // Reset typing when closing chat
+          if (isTyping) {
+            isTyping = false
+            sendTypingStatus(false)
+          }
           document.getElementById("chatWindow").classList.add("hidden")
           selectedUser = null;
           document.getElementById("chatWithName").textContent = ""
@@ -267,7 +386,6 @@ function notification(receiver, sender, unread) {
     sender_nickname: sender,
     ...(unread != null && { unread_messages: unread })
   };
-
 
   fetch("/notification", {
     method: "POST",
