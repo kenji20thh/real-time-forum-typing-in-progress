@@ -139,6 +139,33 @@ function showTypingIndicator(username, show) {
   }
 }
 
+// Function to show typing indicator in user list
+function showTypingInUserList(username, show) {
+  const userList = document.getElementById("userList")
+  const users = userList.getElementsByClassName("user")
+  
+  for (let div of users) {
+    const nameSpan = div.querySelector("span:first-child")
+    if (nameSpan && nameSpan.textContent === username) {
+      let typingBadge = div.querySelector(".typing-badge")
+      
+      if (show && !typingBadge) {
+        typingBadge = document.createElement("span")
+        typingBadge.classList.add("typing-badge")
+        typingBadge.innerHTML = `
+          <span class="typing-dots-small">
+            <span>.</span><span>.</span><span>.</span>
+          </span>
+        `
+        div.appendChild(typingBadge)
+      } else if (!show && typingBadge) {
+        typingBadge.remove()
+      }
+      break
+    }
+  }
+}
+
 // real time connexion using websockets, listens for msg, update
 export function startChatFeature(currentUsername) {
   currentUser = currentUsername
@@ -151,13 +178,19 @@ export function startChatFeature(currentUsername) {
     } else if (data.type === "typing") {
       // Handle typing indicator
       if (data.from === selectedUser) {
+        // Show in chat if chat is open with this user
         showTypingIndicator(data.from, data.isTyping)
+      } else {
+        // Show in user list if chat is closed or different user
+        showTypingInUserList(data.from, data.isTyping)
       }
     } else {
       // Hide typing indicator when message is received
       if (data.from === selectedUser) {
         showTypingIndicator(data.from, false)
       }
+      // Also hide from user list
+      showTypingInUserList(data.from, false)
       
       newMessages++
       if (data.from === selectedUser || data.to === selectedUser) {
@@ -320,6 +353,10 @@ function setUserList(users) {
 
       const badge = div.querySelector(".notification-badge")
       if (badge) badge.remove()
+      
+      // Remove typing indicator from user list when opening chat
+      const typingBadge = div.querySelector(".typing-badge")
+      if (typingBadge) typingBadge.remove()
 
       // close chat button 
       const closeChatBtn = document.getElementById("closeChatBtn")
