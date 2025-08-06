@@ -32,7 +32,7 @@ async function loadMessagesPage(from, to, page) {
   if (loader) loader.classList.remove("hidden")
 
   try {
-    const res = await fetch(`/messages?from=${from}&to=${to}&offset=${offset+newMessages}`)
+    const res = await fetch(`/messages?from=${from}&to=${to}&offset=${offset + newMessages}`)
     if (!res.ok) throw new Error("Failed to load chat messages")
     const messages = await res.json()
     if (messages.length === 0) {
@@ -43,11 +43,11 @@ async function loadMessagesPage(from, to, page) {
       const oldScrollTop = container.scrollTop
       const sortedMessages = messages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
       sortedMessages.reverse().forEach(msg => renderMessageAtTop(msg))
-      
+
       const newScrollHeight = container.scrollHeight
       const heightDifference = newScrollHeight - oldScrollHeight
       container.scrollTop = oldScrollTop + heightDifference
-      
+
       const cached = chatCache.get(to) || []
       const chronologicalMessages = messages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
       chatCache.set(to, [...chronologicalMessages, ...cached])
@@ -62,7 +62,7 @@ async function loadMessagesPage(from, to, page) {
     setTimeout(() => {
       if (loader) loader.classList.add("hidden")
       isFetching = false
-      
+
       const container = document.getElementById("chatMessages")
       if (container && container.scrollTop <= 100 && !noMoreMessages) {
         setTimeout(() => {
@@ -104,7 +104,7 @@ export function startChatFeature(currentUsername) {
         const cached = chatCache.get(chatKey) || []
         chatCache.set(chatKey, [...cached, data])
       } else if (data.to === currentUser) {
-        notification(data.to,data.from)
+        notification(data.to, data.from,1)
       }
     }
   })
@@ -120,7 +120,7 @@ export function startChatFeature(currentUsername) {
           if (!res.ok) throw new Error('Not logged in')
           return res.json()
         })
-        .then(data => {
+        .then(() => {
           const content = input.value.trim();
           if (!content || !selectedUser) return;
 
@@ -177,6 +177,7 @@ function setUserList(users) {
     statusSpan.classList.add("status", "online")
     div.appendChild(nameSpan)
     div.appendChild(statusSpan)
+    notification(currentUser, username)
     div.addEventListener("click", async () => {
       chatPage = 0
       noMoreMessages = false
@@ -189,13 +190,13 @@ function setUserList(users) {
       const scrollHandler = throttle(async () => {
         const isNearTop = chatContainer.scrollTop <= 100
         const isAtTop = chatContainer.scrollTop === 0
-        
+
         if ((isNearTop || isAtTop) && !isFetching && !noMoreMessages) {
           isFetching = true
           chatPage += 1
           await loadMessagesPage(currentUser, selectedUser, chatPage)
         }
-      }, 200) 
+      }, 200)
       chatContainer.scrollHandler = scrollHandler
       chatContainer.addEventListener("scroll", scrollHandler)
       selectedUser = username
@@ -215,7 +216,7 @@ function setUserList(users) {
           document.getElementById("chatWithName").textContent = ""
         }
       }
-
+      notification(currentUser, username, 0)
       const cachedMessages = chatCache.get(username)
       if (cachedMessages) {
         const sortedCached = [...cachedMessages].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
@@ -243,7 +244,7 @@ function setUserList(users) {
 function updateNotificationBadge(data) {
   const userList = document.getElementById("userList")
   const users = userList.getElementsByClassName("user")
-  if (!userList) return;
+  if (!userList || data.unread_messages == 0) return;
 
   for (let div of users) {
     const nameSpan = div.querySelector("span:first-child")
@@ -260,11 +261,13 @@ function updateNotificationBadge(data) {
   }
 }
 
-function notification(receiver,sender) {
-    const notifData = {
+function notification(receiver, sender, unread) {
+  const notifData = {
     receiver_nickname: receiver,
-    sender_nickname: sender
+    sender_nickname: sender,
+    ...(unread != null && { unread_messages: unread })
   };
+
 
   fetch("/notification", {
     method: "POST",

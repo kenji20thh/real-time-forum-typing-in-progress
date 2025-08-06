@@ -40,6 +40,8 @@ func (S *Server) initRoutes() {
 	S.Mux.Handle("/", http.FileServer(http.Dir("./static")))
 	S.Mux.HandleFunc("/logged", S.LoggedHandler)
 
+	S.Mux.HandleFunc("/notification", S.Notification)
+
 	S.Mux.Handle("/createPost", S.SessionMiddleware(http.HandlerFunc(S.CreatePostHandler)))
 	S.Mux.HandleFunc("/posts", S.GetPostsHandler)
 
