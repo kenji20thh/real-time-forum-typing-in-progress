@@ -11,7 +11,12 @@ const messagePerPage = 10
 let isFetching = false
 let noMoreMessages = false
 let chatContainer = null
-let displayedMessagesCount = 0 //actual messages on screen
+let newMessages = 0
+
+// Typing indicator variables
+let typingTimeout = null
+let isTyping = false
+const TYPING_TIMEOUT = 3000 // Stop showing typing after 3 seconds of inactivity
 
 // throttle function with func and wait time as args
 const throttle = (fn, wait) => {
@@ -25,15 +30,24 @@ const throttle = (fn, wait) => {
   }
 }
 
+// Debounce function for typing indicator
+const debounce = (fn, delay) => {
+  let timeoutId
+  return function (...args) {
+    clearTimeout(timeoutId)
+    timeoutId = setTimeout(() => fn.apply(this, args), delay)
+  }
+}
+
 async function loadMessagesPage(from, to, page) {
-  const offset = displayedMessagesCount
+  const offset = page * messagePerPage
   const loader = document.getElementById("chatLoader")
   const minDisplayTime = 500 // milliseconds
   const start = Date.now()
   if (loader) loader.classList.remove("hidden")
 
   try {
-    const res = await fetch(`/messages?from=${from}&to=${to}&offset=${offset}`)
+    const res = await fetch(`/messages?from=${from}&to=${to}&offset=${offset + newMessages}`)
     if (!res.ok) throw new Error("Failed to load chat messages")
     const messages = await res.json()
     if (messages.length === 0) {
@@ -44,14 +58,11 @@ async function loadMessagesPage(from, to, page) {
       const oldScrollTop = container.scrollTop
       const sortedMessages = messages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
       sortedMessages.reverse().forEach(msg => renderMessageAtTop(msg))
-      
-      displayedMessagesCount += messages.length
 
       const newScrollHeight = container.scrollHeight
       const heightDifference = newScrollHeight - oldScrollHeight
       container.scrollTop = oldScrollTop + heightDifference
 
-      // update cache with new messages
       const cached = chatCache.get(to) || []
       const chronologicalMessages = messages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
       chatCache.set(to, [...chronologicalMessages, ...cached])
@@ -91,7 +102,44 @@ const renderMessageAtTop = (msg) => {
   container.insertBefore(div, container.firstChild)
 }
 
-// real time connexion using websockets
+// Function to send typing status
+function sendTypingStatus(isTypingNow) {
+  if (!socket || !selectedUser) return
+  
+  const typingMessage = {
+    type: 'typing',
+    from: currentUser,
+    to: selectedUser,
+    isTyping: isTypingNow
+  }
+  
+  socket.send(JSON.stringify(typingMessage))
+}
+
+// Function to show/hide typing indicator
+function showTypingIndicator(username, show) {
+  const container = document.getElementById("chatMessages")
+  let typingIndicator = document.getElementById("typingIndicator")
+  
+  if (show && !typingIndicator) {
+    typingIndicator = document.createElement("div")
+    typingIndicator.id = "typingIndicator"
+    typingIndicator.className = "typing-indicator"
+    typingIndicator.innerHTML = `
+      <p><em>${username} is typing</em>
+        <span class="typing-dots">
+          <span>.</span><span>.</span><span>.</span>
+        </span>
+      </p>
+    `
+    container.appendChild(typingIndicator)
+    container.scrollTop = container.scrollHeight
+  } else if (!show && typingIndicator) {
+    typingIndicator.remove()
+  }
+}
+
+// real time connexion using websockets, listens for msg, update
 export function startChatFeature(currentUsername) {
   currentUser = currentUsername
   socket = new WebSocket("ws://" + window.location.host + "/ws")
@@ -100,15 +148,25 @@ export function startChatFeature(currentUsername) {
     const data = JSON.parse(event.data)
     if (data.type === "user_list") {
       setUserList(data.users)
+    } else if (data.type === "typing") {
+      // Handle typing indicator
+      if (data.from === selectedUser) {
+        showTypingIndicator(data.from, data.isTyping)
+      }
     } else {
+      // Hide typing indicator when message is received
+      if (data.from === selectedUser) {
+        showTypingIndicator(data.from, false)
+      }
+      
+      newMessages++
       if (data.from === selectedUser || data.to === selectedUser) {
         renderMessage(data)
-        displayedMessagesCount++ // increment for  messages
         const chatKey = data.from === currentUser ? data.to : data.from
         const cached = chatCache.get(chatKey) || []
         chatCache.set(chatKey, [...cached, data])
       } else if (data.to === currentUser) {
-        notification(data.to, data.from, 1)
+        notification(data.to, data.from,1)
       }
     }
   })
@@ -116,7 +174,45 @@ export function startChatFeature(currentUsername) {
   const sendBtn = document.getElementById("sendBtn")
   const input = document.getElementById("messageInput")
   if (sendBtn && input) {
+    
+    // Add typing event listeners
+    const handleTyping = debounce(() => {
+      if (isTyping) {
+        isTyping = false
+        sendTypingStatus(false)
+      }
+    }, 1000) // Stop typing after 1 second of inactivity
+
+    input.addEventListener('input', () => {
+      if (!isTyping && input.value.trim().length > 0) {
+        isTyping = true
+        sendTypingStatus(true)
+      } else if (isTyping && input.value.trim().length === 0) {
+        isTyping = false
+        sendTypingStatus(false)
+        return
+      }
+      
+      if (input.value.trim().length > 0) {
+        handleTyping()
+      }
+    })
+
+    // Stop typing on blur
+    input.addEventListener('blur', () => {
+      if (isTyping) {
+        isTyping = false
+        sendTypingStatus(false)
+      }
+    })
+
     const sendMessage = () => {
+      // Stop typing indicator when sending
+      if (isTyping) {
+        isTyping = false
+        sendTypingStatus(false)
+      }
+      
       fetch('/logged', {
         credentials: 'include'
       })
@@ -136,7 +232,6 @@ export function startChatFeature(currentUsername) {
           }
           socket.send(JSON.stringify(message))
           renderMessage(message)
-          displayedMessagesCount++ // increment for sent messages
           const cached = chatCache.get(selectedUser) || []
           chatCache.set(selectedUser, [...cached, message])
           input.value = ""
@@ -147,7 +242,15 @@ export function startChatFeature(currentUsername) {
           document.getElementById("chatWindow").classList.add('hidden')
         })
     }
+    
     sendBtn.addEventListener("click", sendMessage);
+    
+    // Send on Enter key
+    input.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        sendMessage()
+      }
+    })
   }
 }
 
@@ -184,13 +287,15 @@ function setUserList(users) {
     div.appendChild(statusSpan)
     notification(currentUser, username)
     div.addEventListener("click", async () => {
-      // reset pagination state for new chat
+      // Reset typing status when switching chats
+      if (isTyping) {
+        isTyping = false
+        sendTypingStatus(false)
+      }
+      
       chatPage = 0
       noMoreMessages = false
-      displayedMessagesCount = 0 // reset message counter
       chatContainer = document.getElementById("chatMessages")
-      
-      // remove existing scroll handler
       const existingHandler = chatContainer.scrollHandler
       if (existingHandler) {
         chatContainer.removeEventListener("scroll", existingHandler)
@@ -208,7 +313,6 @@ function setUserList(users) {
       }, 200)
       chatContainer.scrollHandler = scrollHandler
       chatContainer.addEventListener("scroll", scrollHandler)
-      
       selectedUser = username
       document.getElementById("chatWithName").textContent = username
       document.getElementById("chatWindow").classList.remove("hidden")
@@ -221,22 +325,21 @@ function setUserList(users) {
       const closeChatBtn = document.getElementById("closeChatBtn")
       if (closeChatBtn) {
         closeChatBtn.onclick = () => {
+          // Reset typing when closing chat
+          if (isTyping) {
+            isTyping = false
+            sendTypingStatus(false)
+          }
           document.getElementById("chatWindow").classList.add("hidden")
           selectedUser = null;
           document.getElementById("chatWithName").textContent = ""
-          // reset pagination state when closing chat
-          chatPage = 0
-          noMoreMessages = false
-          displayedMessagesCount = 0 // reset message counter
         }
       }
       notification(currentUser, username, 0)
-      
       const cachedMessages = chatCache.get(username)
       if (cachedMessages) {
         const sortedCached = [...cachedMessages].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
         sortedCached.forEach(renderMessage)
-        displayedMessagesCount = sortedCached.length // set correct count
       } else {
         try {
           chatPage = 0
@@ -247,7 +350,6 @@ function setUserList(users) {
           const sortedMessages = messages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
           chatCache.set(selectedUser, sortedMessages)
           sortedMessages.forEach(renderMessage)
-          displayedMessagesCount = sortedMessages.length // set correct count
         } catch (err) {
           console.error("Chat history error:", err)
         }
@@ -294,14 +396,14 @@ function notification(receiver, sender, unread) {
   })
     .then(res => {
       if (!res.ok) {
-        throw new Error("notif failed")
+        throw new Error("notif failed");
       }
-      return res.json()
+      return res.json();
     })
     .then(data => {
       updateNotificationBadge(data)
     })
     .catch(err => {
-      console.error(err)
-    })
+      console.error(err);
+    });
 }
