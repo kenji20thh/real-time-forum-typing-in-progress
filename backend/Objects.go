@@ -33,6 +33,13 @@ type Message struct {
 	Timestamp string `json:"timestamp"`
 }
 
+type TypingIndicator struct {
+	Type     string `json:"type"`
+	From     string `json:"from"`
+	To       string `json:"to"`
+	IsTyping bool   `json:"isTyping"`
+}
+
 type Client struct {
 	ID       string          `json:"id"` // Added ID field
 	Conn     *websocket.Conn `json:"-"`  // Added json:"-" to exclude from JSON
