@@ -922,3 +922,74 @@ select:focus-visible {
   outline-offset: 2px;
   box-shadow: var(--glow-accent);
 }
+
+
+/* Add this to your existing style.css file */
+
+/* Typing indicator styles */
+.typing-indicator {
+  background-color: #f0f0f0;
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin: 5px 0;
+  border-left: 3px solid #007bff;
+}
+
+.typing-indicator p {
+  margin: 0;
+  color: #666;
+  font-style: italic;
+  font-size: 0.9em;
+}
+
+.typing-dots {
+  display: inline-block;
+  margin-left: 5px;
+}
+
+.typing-dots span {
+  display: inline-block;
+  animation: typing-blink 1.4s infinite both;
+  font-weight: bold;
+  color: #007bff;
+}
+
+.typing-dots span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.typing-dots span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes typing-blink {
+  0%, 80%, 100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+}
+
+/* Optional: Add some hover effects for better UX */
+.typing-indicator:hover {
+  background-color: #e8e8e8;
+}
+
+/* Make sure typing indicator is visually distinct from regular messages */
+#chatMessages .typing-indicator {
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
