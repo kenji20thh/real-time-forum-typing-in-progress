@@ -3,6 +3,7 @@ package backend
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"html"
 	"log"
@@ -152,6 +153,31 @@ func (S *Server) GetHashedPasswordFromDB(identifier string) (string, string, err
 	return hashedPassword, nickname, nil
 }
 
+// Handle typing indicators
+func (s *Server) handleTypingIndicator(client *Client, typingData TypingIndicator) {
+	// Send typing indicator to all sessions of the recipient
+	if recipientSessions, ok := s.clients[typingData.To]; ok {
+		for _, recipient := range recipientSessions {
+			err := recipient.Conn.WriteJSON(typingData)
+			if err != nil {
+				fmt.Println("Send Error to recipient (typing):", err)
+			}
+		}
+	}
+
+	// Send to all other sessions of the sender (excluding current session)
+	if senderSessions, ok := s.clients[typingData.From]; ok {
+		for _, senderClient := range senderSessions {
+			if senderClient.ID != client.ID { // Don't send back to the same session
+				err := senderClient.Conn.WriteJSON(typingData)
+				if err != nil {
+					fmt.Println("Send Error to sender session (typing):", err)
+				}
+			}
+		}
+	}
+}
+
 // Modified receiveMessages function
 func (s *Server) receiveMessages(client *Client) {
 	defer func() {
@@ -176,11 +202,39 @@ func (s *Server) receiveMessages(client *Client) {
 	}()
 
 	for {
-		var msg Message
-		err := client.Conn.ReadJSON(&msg)
+		var rawMessage json.RawMessage
+		err := client.Conn.ReadJSON(&rawMessage)
 		if err != nil {
 			fmt.Println("WebSocket Read Error:", err)
 			break
+		}
+
+		// Parse the message to determine its type
+		var messageType struct {
+			Type string `json:"type"`
+		}
+		
+		// First try to parse as typing indicator
+		err = json.Unmarshal(rawMessage, &messageType)
+		if err == nil && messageType.Type == "typing" {
+			// Handle typing indicator
+			var typingData TypingIndicator
+			err = json.Unmarshal(rawMessage, &typingData)
+			if err != nil {
+				fmt.Println("Error parsing typing indicator:", err)
+				continue
+			}
+			typingData.From = client.Username // Ensure from field is set correctly
+			s.handleTypingIndicator(client, typingData)
+			continue
+		}
+
+		// Otherwise, handle as regular message
+		var msg Message
+		err = json.Unmarshal(rawMessage, &msg)
+		if err != nil {
+			fmt.Println("Error parsing message:", err)
+			continue
 		}
 
 		msg.From = client.Username
