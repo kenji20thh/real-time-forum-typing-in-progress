@@ -11,7 +11,7 @@ const messagePerPage = 10
 let isFetching = false
 let noMoreMessages = false
 let chatContainer = null
-let displayedMessagesCount = 0 // Track actual messages on screen
+let displayedMessagesCount = 0 //actual messages on screen
 
 // throttle function with func and wait time as args
 const throttle = (fn, wait) => {
@@ -26,7 +26,6 @@ const throttle = (fn, wait) => {
 }
 
 async function loadMessagesPage(from, to, page) {
-  // Use displayed messages count for offset, not page * messagePerPage
   const offset = displayedMessagesCount
   const loader = document.getElementById("chatLoader")
   const minDisplayTime = 500 // milliseconds
@@ -46,14 +45,13 @@ async function loadMessagesPage(from, to, page) {
       const sortedMessages = messages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
       sortedMessages.reverse().forEach(msg => renderMessageAtTop(msg))
       
-      // Update displayed messages count
       displayedMessagesCount += messages.length
 
       const newScrollHeight = container.scrollHeight
       const heightDifference = newScrollHeight - oldScrollHeight
       container.scrollTop = oldScrollTop + heightDifference
 
-      // Update cache with new messages (prepend to maintain chronological order)
+      // update cache with new messages
       const cached = chatCache.get(to) || []
       const chronologicalMessages = messages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
       chatCache.set(to, [...chronologicalMessages, ...cached])
@@ -93,7 +91,7 @@ const renderMessageAtTop = (msg) => {
   container.insertBefore(div, container.firstChild)
 }
 
-// real time connexion using websockets, listens for msg, update
+// real time connexion using websockets
 export function startChatFeature(currentUsername) {
   currentUser = currentUsername
   socket = new WebSocket("ws://" + window.location.host + "/ws")
@@ -105,7 +103,7 @@ export function startChatFeature(currentUsername) {
     } else {
       if (data.from === selectedUser || data.to === selectedUser) {
         renderMessage(data)
-        displayedMessagesCount++ // Increment for real-time messages
+        displayedMessagesCount++ // increment for  messages
         const chatKey = data.from === currentUser ? data.to : data.from
         const cached = chatCache.get(chatKey) || []
         chatCache.set(chatKey, [...cached, data])
@@ -138,7 +136,7 @@ export function startChatFeature(currentUsername) {
           }
           socket.send(JSON.stringify(message))
           renderMessage(message)
-          displayedMessagesCount++ // Increment for sent messages
+          displayedMessagesCount++ // increment for sent messages
           const cached = chatCache.get(selectedUser) || []
           chatCache.set(selectedUser, [...cached, message])
           input.value = ""
@@ -186,13 +184,13 @@ function setUserList(users) {
     div.appendChild(statusSpan)
     notification(currentUser, username)
     div.addEventListener("click", async () => {
-      // Reset pagination state for new chat
+      // reset pagination state for new chat
       chatPage = 0
       noMoreMessages = false
-      displayedMessagesCount = 0 // Reset message counter
+      displayedMessagesCount = 0 // reset message counter
       chatContainer = document.getElementById("chatMessages")
       
-      // Remove existing scroll handler
+      // remove existing scroll handler
       const existingHandler = chatContainer.scrollHandler
       if (existingHandler) {
         chatContainer.removeEventListener("scroll", existingHandler)
@@ -226,10 +224,10 @@ function setUserList(users) {
           document.getElementById("chatWindow").classList.add("hidden")
           selectedUser = null;
           document.getElementById("chatWithName").textContent = ""
-          // Reset pagination state when closing chat
+          // reset pagination state when closing chat
           chatPage = 0
           noMoreMessages = false
-          displayedMessagesCount = 0 // Reset message counter
+          displayedMessagesCount = 0 // reset message counter
         }
       }
       notification(currentUser, username, 0)
@@ -238,7 +236,7 @@ function setUserList(users) {
       if (cachedMessages) {
         const sortedCached = [...cachedMessages].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
         sortedCached.forEach(renderMessage)
-        displayedMessagesCount = sortedCached.length // Set correct count
+        displayedMessagesCount = sortedCached.length // set correct count
       } else {
         try {
           chatPage = 0
@@ -249,7 +247,7 @@ function setUserList(users) {
           const sortedMessages = messages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
           chatCache.set(selectedUser, sortedMessages)
           sortedMessages.forEach(renderMessage)
-          displayedMessagesCount = sortedMessages.length // Set correct count
+          displayedMessagesCount = sortedMessages.length // set correct count
         } catch (err) {
           console.error("Chat history error:", err)
         }
