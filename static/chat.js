@@ -40,54 +40,63 @@ const debounce = (fn, delay) => {
 }
 
 async function loadMessagesPage(from, to, page) {
-  const offset = page * messagePerPage
-  const loader = document.getElementById("chatLoader")
-  const minDisplayTime = 500 // milliseconds
-  const start = Date.now()
-  if (loader) loader.classList.remove("hidden")
+  const offset = displayedMessagesCount;
+  const loader = document.getElementById("chatLoader");
+  const minDisplayTime = 500; // milliseconds
+  const start = Date.now();
+
+  if (loader) loader.classList.remove("hidden");
 
   try {
-    const res = await fetch(`/messages?from=${from}&to=${to}&offset=${offset + newMessages}`)
-    if (!res.ok) throw new Error("Failed to load chat messages")
-    const messages = await res.json()
+    const res = await fetch(`/messages?from=${from}&to=${to}&offset=${offset}`);
+    if (!res.ok) throw new Error("Failed to load chat messages");
+    const messages = await res.json();
     if (messages.length === 0) {
-      noMoreMessages = true
-    } else {
-      const container = document.getElementById("chatMessages")
-      const oldScrollHeight = container.scrollHeight
-      const oldScrollTop = container.scrollTop
-      const sortedMessages = messages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
-      sortedMessages.reverse().forEach(msg => renderMessageAtTop(msg))
-
-      const newScrollHeight = container.scrollHeight
-      const heightDifference = newScrollHeight - oldScrollHeight
-      container.scrollTop = oldScrollTop + heightDifference
-
-      const cached = chatCache.get(to) || []
-      const chronologicalMessages = messages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
-      chatCache.set(to, [...chronologicalMessages, ...cached])
+      noMoreMessages = true;
+      // Explicitly hide loader when no more messages
+      if (loader) loader.classList.add("hidden");
+      isFetching = false;
+      return; // Exit early
     }
+
+    const container = document.getElementById("chatMessages");
+    const oldScrollHeight = container.scrollHeight;
+    const oldScrollTop = container.scrollTop;
+    const sortedMessages = messages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+    sortedMessages.reverse().forEach(msg => renderMessageAtTop(msg));
+    
+    displayedMessagesCount += messages.length;
+
+    const newScrollHeight = container.scrollHeight;
+    const heightDifference = newScrollHeight - oldScrollHeight;
+    container.scrollTop = oldScrollTop + heightDifference;
+
+    const cached = chatCache.get(to) || [];
+    const chronologicalMessages = messages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+    chatCache.set(to, [...chronologicalMessages, ...cached]);
   } catch (err) {
-    console.error("Pagination error:", err)
+    console.error("Pagination error:", err);
   } finally {
-    const timeElapsed = Date.now() - start
-    const remainingTime = minDisplayTime - timeElapsed
+    const timeElapsed = Date.now() - start;
+    const remainingTime = minDisplayTime - timeElapsed;
 
-    // wait remaining time if too fast
     setTimeout(() => {
-      if (loader) loader.classList.add("hidden")
-      isFetching = false
+      if (loader) loader.classList.add("hidden");
+      isFetching = false;
 
-      const container = document.getElementById("chatMessages")
-      if (container && container.scrollTop <= 100 && !noMoreMessages) {
-        setTimeout(() => {
-          if (container.scrollTop <= 100 && !isFetching && !noMoreMessages) {
-            const event = new Event('scroll')
-            container.dispatchEvent(event)
-          }
-        }, 100)
+      // Only dispatch scroll event if there are more messages to load
+      if (!noMoreMessages) {
+        const container = document.getElementById("chatMessages");
+        if (container && container.scrollTop <= 100) {
+          setTimeout(() => {
+            if (container.scrollTop <= 100 && !isFetching && !noMoreMessages) {
+              const event = new Event('scroll');
+              container.dispatchEvent(event);
+            }
+          }, 100);
+        }
       }
-    }, remainingTime > 0 ? remainingTime : 0)
+    }, remainingTime > 0 ? remainingTime : 0);
   }
 }
 
